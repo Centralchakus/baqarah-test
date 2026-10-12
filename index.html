@@ -102,6 +102,21 @@
             direction: ltr;
         }
 
+        .audio-cue {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .btn-audio {
+            background-color: #2980b9;
+            color: white;
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
         .ayah-list {
             display: flex;
             flex-direction: column;
@@ -137,8 +152,13 @@
             transition: filter 0.3s ease;
         }
 
+        .blur-first {
+            /* Keeps the first verse completely hidden too, so he only hears it or reads it after unblurring */
+            filter: blur(8px);
+        }
+
         .revealed {
-            filter: blur(0);
+            filter: blur(0) !important;
         }
 
         .loading-text {
@@ -168,8 +188,8 @@
     <script>
         let allAyahs = [];
         let isRevealed = false;
+        let firstAyahText = "";
 
-        // Fetch full Suratul Baqarah from Quran API
         async function loadSurah() {
             try {
                 const response = await fetch('https://api.alquran.cloud/v1/surah/2');
@@ -177,30 +197,36 @@
                 allAyahs = data.data.ayahs;
                 document.getElementById('content').innerHTML = 'Click <b>"Start 10-Verse Test"</b> above to get 10 random consecutive verses.';
             } catch (error) {
-                document.getElementById('content').innerHTML = '⚠️ Failed to load Quran text. Make sure you are connected to the internet or viewing this site via GitHub Pages.';
+                document.getElementById('content').innerHTML = '⚠️ Failed to load Quran text. Check your internet connection.';
             }
         }
 
         function generateRandomTest() {
             if (allAyahs.length === 0) {
-                alert("Quran data is still loading. Please wait a few seconds and try again.");
+                alert("Quran data is still loading. Please wait a few seconds.");
                 return;
             }
 
-            // Pick a random starting point so 10 verses fit (1 to 277)
             const maxStart = allAyahs.length - 10;
             const randomIndex = Math.floor(Math.random() * maxStart);
-
-            // Get 10 consecutive verses
             const currentTestAyahs = allAyahs.slice(randomIndex, randomIndex + 10);
 
             const startNum = currentTestAyahs[0].numberInSurah;
             const endNum = currentTestAyahs[currentTestAyahs.length - 1].numberInSurah;
 
+            // Save first verse text for audio reading
+            firstAyahText = currentTestAyahs[0].text;
+
             let html = `<div class="test-header">Recite Verses ${startNum} to ${endNum}</div>`;
+            html += `
+                <div class="audio-cue">
+                    <button class="btn-audio" onclick="playFirstAyah()">🔊 Play Starting Verse Audio</button>
+                </div>
+            `;
             html += `<div class="ayah-list">`;
 
-            currentTestAyahs.forEach(ayah => {
+            currentTestAyahs.forEach((ayah, index) => {
+                // First verse gets a special class if we want, but all are blurred for testing
                 html += `
                     <div class="ayah-box">
                         <span class="ayah-number">Verse ${ayah.numberInSurah}</span>
@@ -213,11 +239,24 @@
 
             document.getElementById('content').innerHTML = html;
             
-            // Reset Reveal Button
             isRevealed = false;
             const revealBtn = document.getElementById('revealBtn');
             revealBtn.disabled = false;
             revealBtn.innerText = "👁️ Reveal Verses";
+
+            // Automatically play the audio of the first verse when test starts
+            playFirstAyah();
+        }
+
+        function playFirstAyah() {
+            if (!firstAyahText) return;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Stop any previous audio
+                const utterance = new SpeechSynthesisUtterance(firstAyahText);
+                utterance.lang = 'ar-SA'; // Set language to Arabic
+                utterance.rate = 0.9; // Slightly slower for recitation clarity
+                window.speechSynthesis.speak(utterance);
+            }
         }
 
         function toggleReveal() {
@@ -237,7 +276,6 @@
             revealBtn.innerText = isRevealed ? "🙈 Hide Verses" : "👁️ Reveal Verses";
         }
 
-        // Initialize API fetch on page load
         loadSurah();
     </script>
 </body>
